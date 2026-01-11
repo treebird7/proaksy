@@ -1,0 +1,44 @@
+{
+    "name": "proaksy",
+    "version": "1.0.0",
+    "description": "🌳 Stateless MCP proxy - Converts persistent stdio MCP connections to stateless per-request invocations",
+    "main": "dist/index.js",
+    "bin": {
+        "proaksy": "./dist/bin/proaksy.js"
+    },
+    "scripts": {
+        "build": "tsc",
+        "prepublishOnly": "npm run build"
+    },
+    "keywords": [
+        "mcp",
+        "model-context-protocol",
+        "proxy",
+        "stateless",
+        "ai",
+        "claude",
+        "antigravity",
+        "treebird"
+    ],
+    "author": "Treebird",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/treebird7/proaksy.git"
+    },
+    "homepage": "https://github.com/treebird7/proaksy#readme",
+    "bugs": {
+        "url": "https://github.com/treebird7/proaksy/issues"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "devDependencies": {
+        "typescript": "^5.0.0",
+        "@types/node": "^20.0.0"
+    }
+}
