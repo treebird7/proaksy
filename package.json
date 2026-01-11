@@ -4,7 +4,7 @@
     "description": "🌳 Stateless MCP proxy - Converts persistent stdio MCP connections to stateless per-request invocations",
     "main": "dist/index.js",
     "bin": {
-        "proaksy": "./dist/bin/proaksy.js"
+        "proaksy": "dist/bin/proaksy.js"
     },
     "scripts": {
         "build": "tsc",
