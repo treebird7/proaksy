@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/proaksy-glyph.png" alt="prOaksy" width="128">
+</p>
+
 # prOaksy 🌳
 
 **Stateless MCP Proxy** - Converts persistent stdio MCP connections to stateless per-request invocations.
