@@ -1,0 +1,18 @@
+{
+  "branches": {
+    "main": {
+      "name": "main",
+      "files": [
+        "README.md",
+        "src",
+        "CHANGELOG.md",
+        ".gitignore"
+      ],
+      "status": "active",
+      "description": "Proaksy",
+      "agent": "ssan",
+      "registeredAt": "2026-03-20T08:58:15.635Z"
+    }
+  },
+  "version": "1.0"
+}
