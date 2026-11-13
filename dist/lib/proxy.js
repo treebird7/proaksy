@@ -1,88 +1,168 @@
 "use strict";
 /**
- * prOaksy Proxy Core Library
+ * prOaksy round-trip module.
+ *
+ * Interface: createProxy(options).handle(line) → reply line, or null when the
+ * message needs no reply. Everything MCP-specific lives behind it:
+ *   - notifications get no reply and spawn nothing
+ *   - the client's `initialize` is cached and replayed (plus
+ *     `notifications/initialized`) into every fresh server
+ *   - the reply is the line whose id matches the request; server
+ *     notifications and logs printed before it are skipped
+ *   - timeout, early exit and spawn failure become JSON-RPC errors carrying
+ *     the request's id
+ *
+ * ponytail: server→client messages (progress, sampling, roots) are dropped —
+ * the server is killed once its reply arrives. Stateless servers only.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.executeRequest = executeRequest;
+exports.errorLine = errorLine;
+exports.createProxy = createProxy;
 const child_process_1 = require("child_process");
-function log(config, ...args) {
-    if (config.debug) {
-        console.error('[prOaksy]', ...args);
-    }
+const HANDSHAKE_ID = '__proaksy_initialize__';
+const STDERR_TAIL = 2000;
+// Servers run in their own process group so a wrapper (npx, sh, envoak inject)
+// and the real server die together. Groups still alive when we exit are killed too.
+const liveGroups = new Set();
+const killGroup = (pid) => { try {
+    process.kill(-pid, 'SIGKILL');
 }
-async function executeRequest(config, request) {
-    const timeout = config.timeout || 30000;
-    return new Promise((resolve, reject) => {
-        log(config, 'Spawning fresh process for request');
-        const child = (0, child_process_1.spawn)('node', [config.targetScript], {
-            env: { ...process.env, ...config.env },
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-        let stdout = '';
-        let stderr = '';
-        let resolved = false;
-        const timeoutHandle = setTimeout(() => {
-            if (!resolved) {
-                resolved = true;
-                child.kill('SIGTERM');
-                reject(new Error('Request timeout'));
+catch { /* already gone */ } };
+process.on('exit', () => liveGroups.forEach(killGroup));
+function errorLine(id, code, message) {
+    return JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } });
+}
+function createProxy(options) {
+    if (options.command.length === 0)
+        throw new Error('command must not be empty');
+    const timeoutMs = options.timeoutMs ?? 30000;
+    const log = (...args) => { if (options.debug)
+        console.error('[prOaksy]', ...args); };
+    let cachedInitialize = null;
+    async function handle(line) {
+        let msg;
+        try {
+            msg = JSON.parse(line);
+        }
+        catch {
+            return errorLine(null, -32700, 'Parse error');
+        }
+        if (typeof msg !== 'object' || msg === null || Array.isArray(msg)) {
+            return errorLine(null, -32600, 'Invalid Request (batches are not supported)');
+        }
+        // Notification (no id): nothing to answer and no server to wake.
+        if (!('id' in msg) || msg.id === undefined)
+            return null;
+        const id = msg.id;
+        if (msg.method === 'initialize') {
+            cachedInitialize = msg;
+            return roundTrip(id, [line]);
+        }
+        const preamble = cachedInitialize
+            ? [
+                JSON.stringify({ ...cachedInitialize, id: HANDSHAKE_ID }),
+                JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+            ]
+            : [];
+        return roundTrip(id, [...preamble, line], preamble.length > 0);
+    }
+    /** Spawn a fresh server, write `lines`, resolve with the reply whose id === `id`. */
+    function roundTrip(id, lines, awaitHandshake = false) {
+        return new Promise((resolve) => {
+            const [cmd, ...args] = options.command;
+            log('spawn', options.command.join(' '), 'for id', id);
+            let child;
+            try {
+                child = (0, child_process_1.spawn)(cmd, args, {
+                    env: { ...process.env, ...options.env },
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    detached: true,
+                });
             }
-        }, timeout);
-        child.stdout.on('data', (data) => {
-            stdout += data.toString();
-            const lines = stdout.split('\n').filter(l => l.trim());
-            for (const line of lines) {
+            catch (err) {
+                return resolve(errorLine(id, -32603, `Failed to start server: ${err.message}`));
+            }
+            const pid = child.pid;
+            if (pid)
+                liveGroups.add(pid);
+            const stdin = child.stdin, stdout = child.stdout, stderrStream = child.stderr;
+            let buffer = '';
+            let stderr = '';
+            let done = false;
+            const finish = (reply) => {
+                if (done)
+                    return;
+                done = true;
+                clearTimeout(timer);
+                if (pid) {
+                    killGroup(pid);
+                    liveGroups.delete(pid);
+                }
+                // An orphan that escaped the group could still hold our pipes open.
+                stdin.destroy();
+                stdout.destroy();
+                stderrStream.destroy();
+                resolve(reply);
+            };
+            const timer = setTimeout(() => finish(errorLine(id, -32603, `Request timed out after ${timeoutMs}ms`)), timeoutMs);
+            // Handshake first: send the request only after the server answers initialize.
+            const [first, ...rest] = lines;
+            const send = (l) => { if (!stdin.destroyed)
+                stdin.write(l + '\n'); };
+            if (awaitHandshake)
+                send(first);
+            else
+                lines.forEach(send);
+            let pending = awaitHandshake ? rest : [];
+            const onLine = (raw) => {
+                const out = raw.trim();
+                if (!out)
+                    return;
+                let reply;
                 try {
-                    const parsed = JSON.parse(line);
-                    if (parsed.jsonrpc && (parsed.result !== undefined || parsed.error !== undefined)) {
-                        if (!resolved) {
-                            resolved = true;
-                            clearTimeout(timeoutHandle);
-                            child.kill('SIGTERM');
-                            resolve(line);
-                        }
-                    }
+                    reply = JSON.parse(out);
                 }
                 catch {
-                    // Not complete JSON yet
+                    log('non-JSON stdout:', out.slice(0, 200));
+                    return;
                 }
-            }
-        });
-        child.stderr.on('data', (data) => {
-            stderr += data.toString();
-            log(config, 'stderr:', data.toString().trim());
-        });
-        child.on('close', (code) => {
-            if (!resolved) {
-                resolved = true;
-                clearTimeout(timeoutHandle);
-                if (code !== 0 && !stdout.includes('"jsonrpc"')) {
-                    reject(new Error(`Process exited with code ${code}: ${stderr}`));
+                if (typeof reply !== 'object' || reply === null || Array.isArray(reply))
+                    return;
+                const r = reply;
+                if (r.result === undefined && r.error === undefined) {
+                    log('dropped server message:', r.method);
+                    return;
                 }
-                else {
-                    const lines = stdout.split('\n').filter(l => l.trim());
-                    for (const line of lines) {
-                        try {
-                            const parsed = JSON.parse(line);
-                            if (parsed.jsonrpc) {
-                                resolve(line);
-                                return;
-                            }
-                        }
-                        catch { }
+                if (r.id === HANDSHAKE_ID && pending.length) {
+                    if (r.error !== undefined) {
+                        finish(errorLine(id, -32603, `Server rejected replayed initialize: ${JSON.stringify(r.error)}`));
+                        return;
                     }
-                    reject(new Error('No valid JSON-RPC response'));
+                    pending.forEach(send);
+                    pending = [];
                 }
-            }
+                else if (r.id === id) {
+                    finish(out);
+                }
+            };
+            stdout.setEncoding('utf8'); // decoder keeps multi-byte chars split across chunks intact
+            stdout.on('data', (chunk) => {
+                buffer += chunk;
+                const parts = buffer.split('\n');
+                buffer = parts.pop();
+                parts.forEach(onLine);
+            });
+            stderrStream.on('data', (chunk) => {
+                stderr = (stderr + chunk.toString()).slice(-STDERR_TAIL);
+                log('stderr:', chunk.toString().trim());
+            });
+            stdin.on('error', () => { });
+            child.on('error', (err) => finish(errorLine(id, -32603, `Failed to start server: ${err.message}`)));
+            child.on('close', (code, signal) => {
+                onLine(buffer); // a final reply may lack its trailing newline
+                finish(errorLine(id, -32603, `Server exited (${signal ?? code}) before replying: ${stderr.trim()}`));
+            });
         });
-        child.on('error', (err) => {
-            if (!resolved) {
-                resolved = true;
-                clearTimeout(timeoutHandle);
-                reject(err);
-            }
-        });
-        child.stdin.write(request + '\n');
-        child.stdin.end();
-    });
+    }
+    return { handle };
 }

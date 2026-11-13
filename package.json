@@ -1,6 +1,6 @@
 {
     "name": "proaksy",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "🌳 Stateless MCP proxy - Converts persistent stdio MCP connections to stateless per-request invocations",
     "main": "dist/index.js",
     "bin": {
@@ -8,7 +8,8 @@
     },
     "scripts": {
         "build": "tsc",
-        "prepublishOnly": "npm run build"
+        "prepublishOnly": "npm run build",
+        "test": "tsc && node --test test/"
     },
     "keywords": [
         "mcp",
