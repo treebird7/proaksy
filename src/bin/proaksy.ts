@@ -4,7 +4,8 @@
  */
 
 import { createInterface } from 'readline';
-import { createProxy, ProxyOptions } from '../lib/proxy';
+import { constants } from 'os';
+import { createProxy, killAllServers, ProxyOptions } from '../lib/proxy';
 
 const HELP = `
 prOaksy - Stateless MCP Proxy 🌳
@@ -76,6 +77,9 @@ async function main(): Promise<void> {
     const proxy = createProxy(parseArgs(process.argv.slice(2)));
     const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
     process.stdout.on('error', () => process.exit(0)); // client went away (EPIPE)
+    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+        process.on(sig, () => { killAllServers(); process.exit(128 + constants.signals[sig]); });
+    }
     // ponytail: serial — one slow call blocks the next; replies carry ids, so dropping the await makes it concurrent.
     for await (const line of rl) {
         if (!line.trim()) continue;

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The reply is the response whose id matches the request; log messages and notifications the server prints first are skipped.
 - `--env KEY=a=b` keeps everything after the first `=`.
 - Timeout, crash and spawn failure return a JSON-RPC error carrying the request id.
+- SIGINT/SIGTERM/SIGHUP kill every running server group before exit. Servers are detached, so they would otherwise outlive the proxy.
 
 ### Known limits
 - Stateless servers only: messages the server sends during a call (progress, sampling, roots) are dropped, because the

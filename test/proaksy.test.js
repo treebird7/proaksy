@@ -108,3 +108,22 @@ test('server behind a wrapper (sh/npx/envoak inject) is not left running', () =>
   if (alive) process.kill(pid, 'SIGKILL');
   assert.strictEqual(alive, false, `server pid ${pid} orphaned after proxy exit`);
 });
+
+test('SIGTERM to the proxy mid-request kills the server behind a wrapper', async () => {
+  const fs = require('node:fs'), os = require('node:os');
+  const { spawn } = require('node:child_process');
+  const pidfile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'proaksy-')), 'pid');
+  const proxy = spawn('node', [CLI, '-e', `PIDFILE=${pidfile}`, '--', 'sh', '-c', `node ${EDGE}; :`], { stdio: ['pipe', 'ignore', 'ignore'] });
+  proxy.stdin.write(JSON.stringify(req(1, 'hang')) + '\n'); // stdin stays open: request in flight
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 100 && !fs.existsSync(pidfile); i++) await sleep(50);
+  const pid = Number(fs.readFileSync(pidfile, 'utf8'));
+  const exited = new Promise((r) => proxy.on('exit', (code, signal) => r({ code, signal })));
+  proxy.kill('SIGTERM');
+  assert.deepStrictEqual(await exited, { code: 143, signal: null });
+  await sleep(100);
+  let alive = true;
+  try { process.kill(pid, 0); } catch { alive = false; }
+  if (alive) process.kill(pid, 'SIGKILL');
+  assert.strictEqual(alive, false, `server pid ${pid} survived SIGTERM to the proxy`);
+});

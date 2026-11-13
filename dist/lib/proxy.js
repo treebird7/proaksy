@@ -16,6 +16,7 @@
  * the server is killed once its reply arrives. Stateless servers only.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.killAllServers = killAllServers;
 exports.errorLine = errorLine;
 exports.createProxy = createProxy;
 const child_process_1 = require("child_process");
@@ -23,12 +24,16 @@ const HANDSHAKE_ID = '__proaksy_initialize__';
 const STDERR_TAIL = 2000;
 // Servers run in their own process group so a wrapper (npx, sh, envoak inject)
 // and the real server die together. Groups still alive when we exit are killed too.
+// A detached group doesn't get the terminal's Ctrl-C, and Node skips 'exit' on a fatal
+// signal, so the CLI must call killAllServers() from its SIGINT/SIGTERM/SIGHUP handlers.
 const liveGroups = new Set();
 const killGroup = (pid) => { try {
     process.kill(-pid, 'SIGKILL');
 }
 catch { /* already gone */ } };
-process.on('exit', () => liveGroups.forEach(killGroup));
+/** Kill every server still running. The CLI calls this from its signal handlers. */
+function killAllServers() { liveGroups.forEach(killGroup); liveGroups.clear(); }
+process.on('exit', killAllServers);
 function errorLine(id, code, message) {
     return JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } });
 }

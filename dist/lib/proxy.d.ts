@@ -28,6 +28,8 @@ export interface Proxy {
     handle(line: string): Promise<string | null>;
 }
 type Id = string | number | null;
+/** Kill every server still running. The CLI calls this from its signal handlers. */
+export declare function killAllServers(): void;
 export declare function errorLine(id: Id, code: number, message: string): string;
 export declare function createProxy(options: ProxyOptions): Proxy;
 export {};

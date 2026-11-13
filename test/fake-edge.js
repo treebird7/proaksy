@@ -19,6 +19,10 @@ rl.on('line', (line) => {
     process.stdout.write(reply({ lingering: process.pid }) + '\n');
     setInterval(() => {}, 1000);
     process.stdin.pause();
+  } else if (msg.method === 'hang') {
+    // never replies, ignores stdin EOF, and records its pid for the test
+    require('fs').writeFileSync(process.env.PIDFILE, String(process.pid));
+    setInterval(() => {}, 1000);
   } else {
     process.stdout.write(reply({ method: msg.method }) + '\n');
   }

@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseArgs = parseArgs;
 const readline_1 = require("readline");
+const os_1 = require("os");
 const proxy_1 = require("../lib/proxy");
 const HELP = `
 prOaksy - Stateless MCP Proxy 🌳
@@ -81,6 +82,9 @@ async function main() {
     const proxy = (0, proxy_1.createProxy)(parseArgs(process.argv.slice(2)));
     const rl = (0, readline_1.createInterface)({ input: process.stdin, crlfDelay: Infinity });
     process.stdout.on('error', () => process.exit(0)); // client went away (EPIPE)
+    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+        process.on(sig, () => { (0, proxy_1.killAllServers)(); process.exit(128 + os_1.constants.signals[sig]); });
+    }
     // ponytail: serial — one slow call blocks the next; replies carry ids, so dropping the await makes it concurrent.
     for await (const line of rl) {
         if (!line.trim())
