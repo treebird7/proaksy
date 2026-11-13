@@ -1,9 +1,5 @@
 /**
- * prOaksy - Stateless MCP Proxy
- * 
- * This is the library export for programmatic usage.
- * For CLI usage, use `npx proaksy` or the binary directly.
+ * prOaksy - Stateless MCP Proxy (library entry). CLI: `proaksy`.
  */
-
-export { executeRequest } from './lib/proxy';
-export type { ProxyConfig } from './lib/proxy';
+export { createProxy, errorLine, killAllServers, serverEnv, BASE_ENV } from './lib/proxy';
+export type { ProxyOptions, Proxy } from './lib/proxy';

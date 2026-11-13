@@ -37,29 +37,45 @@ npx proaksy --target ./mcp-server/dist/server.js
 
 ### Basic
 ```bash
-proaksy --target /path/to/mcp-server.js
+proaksy -- node /path/to/mcp-server.js
+proaksy -- node /path/to/toak-mcp.js serve        # servers that take arguments
+proaksy -- envoak vault inject -- node server.js  # wrap with secret injection
+proaksy --target /path/to/mcp-server.js           # shorthand for -- node <script>
 ```
 
 ### With Environment Variables
 ```bash
-proaksy -t ./server.js --env MYCELIUMAIL_AGENT_ID=srlk
-proaksy -t ./server.js -e KEY1=value1 -e KEY2=value2
+proaksy -e KEY1=value1 -e KEY2=value2 -- node ./server.js
 ```
 
 ### With Timeout & Debug
 ```bash
-proaksy -t ./server.js --timeout 60000 --debug
+proaksy --timeout 60000 --debug -- node ./server.js
 ```
 
 ## Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--target <script>` | `-t` | Path to MCP server script (required) |
+| `-- <command> [args...]` | | Server to spawn per request (or use `--target`) |
+| `--target <script>` | `-t` | Shorthand for `-- node <script>` |
 | `--timeout <ms>` | | Request timeout in ms (default: 30000) |
 | `--env KEY=VALUE` | `-e` | Set environment variable (repeatable) |
+| `--clean-env` | | Server gets only PATH, HOME, USER, LOGNAME, SHELL, TMPDIR, LANG, TERM + `--env` |
 | `--debug` | `-d` | Enable debug logging to stderr |
 | `--help` | `-h` | Show help message |
+
+### Protocol handling
+- Notifications from the client get no reply and start no server.
+- The client's `initialize` is remembered and replayed, followed by `notifications/initialized`, into each fresh server.
+- The reply returned is the response whose id matches the request. Anything else the server prints is dropped.
+- **Stateless servers only:** progress updates, sampling and roots requests sent during a call are lost,
+  because the server is killed once it replies.
+- **Trust model:** the server command comes from your own client config. By default it inherits proaksy's
+  full environment, as in 1.x, because `envoak vault inject` and `npx` need it. With `--clean-env` the server gets
+  only `PATH HOME USER LOGNAME SHELL TMPDIR LANG TERM` plus your `--env` values. When a server dies before replying,
+  the error message carries only the last line of its stderr, capped at 300 characters. `--debug` shows the full stderr.
+- On SIGINT, SIGTERM and SIGHUP, proaksy kills every server it started before it exits.
 
 ## MCP Client Configuration
 
