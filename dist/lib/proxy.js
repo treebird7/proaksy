@@ -41,6 +41,10 @@ function createProxy(options) {
     if (options.command.length === 0)
         throw new Error('command must not be empty');
     const timeoutMs = options.timeoutMs ?? 30000;
+    // setTimeout fires immediately above 2^31-1 ms (and on NaN)
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2147483647) {
+        throw new Error(`timeoutMs must be 1..2147483647, got ${timeoutMs}`);
+    }
     const log = (...args) => { if (options.debug)
         console.error('[prOaksy]', ...args); };
     let cachedInitialize = null;
@@ -57,6 +61,9 @@ function createProxy(options) {
         }
         // Notification (no id): nothing to answer and no server to wake.
         if (!('id' in msg) || msg.id === undefined)
+            return null;
+        // A response from the client (id, no method) answers nothing we sent: drop it.
+        if (typeof msg.method !== 'string')
             return null;
         const id = msg.id;
         if (msg.method === 'initialize') {

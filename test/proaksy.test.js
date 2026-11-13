@@ -127,3 +127,16 @@ test('SIGTERM to the proxy mid-request kills the server behind a wrapper', async
   if (alive) process.kill(pid, 'SIGKILL');
   assert.strictEqual(alive, false, `server pid ${pid} survived SIGTERM to the proxy`);
 });
+
+test('a response line from the client gets no reply and starts no server', () => {
+  const t = Date.now();
+  assert.deepStrictEqual(run(['--', 'node', FAKE], [{ jsonrpc: '2.0', id: 9, result: {} }]), []);
+  assert.ok(Date.now() - t < 2000, 'should not wait for a timeout');
+});
+
+test('library createProxy rejects a timeout setTimeout cannot hold', () => {
+  const { createProxy } = require('../dist');
+  for (const timeoutMs of [3000000000, NaN, 0]) {
+    assert.throws(() => createProxy({ command: ['node', FAKE], timeoutMs }), /timeoutMs must be/);
+  }
+});
