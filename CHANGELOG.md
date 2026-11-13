@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--target <script>` stays as shorthand for `-- node <script>`.
 - **Library:** `executeRequest()` is replaced by `createProxy({ command, timeoutMs, env, debug }).handle(line)`,
   which returns the reply line or `null`.
+- `--clean-env` (library: `cleanEnv`): the server gets only a base environment plus `--env` values.
+- Error messages for a crashed server carry only the last stderr line, capped at 300 characters (was the whole stderr).
 - The CLI and library now share one implementation (the two copies had drifted apart).
 
 ### Fixed

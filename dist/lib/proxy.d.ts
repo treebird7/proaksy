@@ -23,11 +23,16 @@ export interface ProxyOptions {
     env?: Record<string, string>;
     /** log to stderr */
     debug?: boolean;
+    /** pass the server only BASE_ENV plus `env`, not proaksy's whole environment */
+    cleanEnv?: boolean;
 }
 export interface Proxy {
     handle(line: string): Promise<string | null>;
 }
 type Id = string | number | null;
+/** What a server gets under cleanEnv: enough to find binaries and a home dir, no credentials. */
+export declare const BASE_ENV: string[];
+export declare function serverEnv(options: ProxyOptions): NodeJS.ProcessEnv;
 /** Kill every server still running. The CLI calls this from its signal handlers. */
 export declare function killAllServers(): void;
 export declare function errorLine(id: Id, code: number, message: string): string;

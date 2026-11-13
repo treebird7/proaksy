@@ -7,9 +7,9 @@ const path = require('node:path');
 const CLI = path.join(__dirname, '..', 'dist', 'bin', 'proaksy.js');
 const FAKE = path.join(__dirname, 'fake-server.js');
 
-function run(args, messages) {
+function run(args, messages, env = process.env) {
   const input = messages.map((m) => (typeof m === 'string' ? m : JSON.stringify(m))).join('\n') + '\n';
-  const r = spawnSync('node', [CLI, ...args], { input, encoding: 'utf8', timeout: 10000 });
+  const r = spawnSync('node', [CLI, ...args], { input, encoding: 'utf8', timeout: 10000, env });
   return r.stdout.split('\n').filter(Boolean).map((l) => JSON.parse(l));
 }
 const init = { jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } };
@@ -139,4 +139,20 @@ test('library createProxy rejects a timeout setTimeout cannot hold', () => {
   for (const timeoutMs of [3000000000, NaN, 0]) {
     assert.throws(() => createProxy({ command: ['node', FAKE], timeoutMs }), /timeoutMs must be/);
   }
+});
+
+test('--clean-env hides ambient secrets but keeps PATH and --env values', () => {
+  const env = { ...process.env, PROAKSY_TEST_SECRET: 'canary' };
+  const [open] = run(['--', 'node', FAKE], [req(1, 'ping')], env);
+  assert.strictEqual(open.result.secret, 'canary'); // default: full environment, as in 1.x
+  const [clean] = run(['--clean-env', '-e', 'A=given', '--', 'node', FAKE], [req(1, 'ping')], env);
+  assert.strictEqual(clean.result.secret, null);
+  assert.strictEqual(clean.result.env, 'given');
+  assert.strictEqual(clean.result.hasPath, true);
+});
+
+test('crash error carries only the last stderr line, capped', () => {
+  const [r] = run(['--', 'node', FAKE], [req(2, 'crash')]);
+  assert.doesNotMatch(r.error.message, /SECRET-A/);
+  assert.ok(r.error.message.length < 400, `message is ${r.error.message.length} chars`);
 });

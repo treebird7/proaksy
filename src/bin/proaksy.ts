@@ -17,6 +17,8 @@ Usage:
 Options:
   -t, --target <script>   Node MCP server script (shorthand for -- node <script>)
   -e, --env KEY=VALUE     Extra environment for the server (repeatable)
+  --clean-env             Give the server only PATH, HOME, USER, LOGNAME, SHELL,
+                          TMPDIR, LANG, TERM plus --env values (default: everything)
   --timeout <ms>          Per-request timeout in ms (default: 30000)
   -d, --debug             Log to stderr
   -h, --help              Show this help
@@ -59,6 +61,9 @@ export function parseArgs(argv: string[]): ProxyOptions {
                 opts.timeoutMs = ms;
                 break;
             }
+            case '--clean-env':
+                opts.cleanEnv = true;
+                break;
             case '-d': case '--debug':
                 opts.debug = true;
                 break;

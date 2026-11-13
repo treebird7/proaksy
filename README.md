@@ -61,6 +61,7 @@ proaksy --timeout 60000 --debug -- node ./server.js
 | `--target <script>` | `-t` | Shorthand for `-- node <script>` |
 | `--timeout <ms>` | | Request timeout in ms (default: 30000) |
 | `--env KEY=VALUE` | `-e` | Set environment variable (repeatable) |
+| `--clean-env` | | Server gets only PATH, HOME, USER, LOGNAME, SHELL, TMPDIR, LANG, TERM + `--env` |
 | `--debug` | `-d` | Enable debug logging to stderr |
 | `--help` | `-h` | Show help message |
 
@@ -70,10 +71,10 @@ proaksy --timeout 60000 --debug -- node ./server.js
 - The reply returned is the response whose id matches the request. Anything else the server prints is dropped.
 - **Stateless servers only:** progress updates, sampling and roots requests sent during a call are lost,
   because the server is killed once it replies.
-- **Trust model:** the server command comes from your own client config, so proaksy treats it like the
-  client would. It inherits proaksy's full environment, as in 1.x, because `envoak vault inject` and `npx`
-  need it. When a server dies before replying, the last 2000 characters of its stderr go back in the error message.
-  Don't put an untrusted command behind proaksy.
+- **Trust model:** the server command comes from your own client config. By default it inherits proaksy's
+  full environment, as in 1.x, because `envoak vault inject` and `npx` need it. With `--clean-env` the server gets
+  only `PATH HOME USER LOGNAME SHELL TMPDIR LANG TERM` plus your `--env` values. When a server dies before replying,
+  the error message carries only the last line of its stderr, capped at 300 characters. `--debug` shows the full stderr.
 - On SIGINT, SIGTERM and SIGHUP, proaksy kills every server it started before it exits.
 
 ## MCP Client Configuration

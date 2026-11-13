@@ -16,12 +16,28 @@
  * the server is killed once its reply arrives. Stateless servers only.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.BASE_ENV = void 0;
+exports.serverEnv = serverEnv;
 exports.killAllServers = killAllServers;
 exports.errorLine = errorLine;
 exports.createProxy = createProxy;
 const child_process_1 = require("child_process");
 const HANDSHAKE_ID = '__proaksy_initialize__';
 const STDERR_TAIL = 2000;
+const ERROR_STDERR_MAX = 300;
+/** What a server gets under cleanEnv: enough to find binaries and a home dir, no credentials. */
+exports.BASE_ENV = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'TERM'];
+function serverEnv(options) {
+    const base = options.cleanEnv
+        ? Object.fromEntries(exports.BASE_ENV.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]]))
+        : process.env;
+    return { ...base, ...options.env };
+}
+/** Last stderr line only, capped: enough to debug, little room to leak. Full stderr: --debug. */
+function stderrHint(stderr) {
+    const last = stderr.trim().split('\n').pop() ?? '';
+    return last.length > ERROR_STDERR_MAX ? '…' + last.slice(-ERROR_STDERR_MAX) : last;
+}
 // Servers run in their own process group so a wrapper (npx, sh, envoak inject)
 // and the real server die together. Groups still alive when we exit are killed too.
 // A detached group doesn't get the terminal's Ctrl-C, and Node skips 'exit' on a fatal
@@ -86,7 +102,7 @@ function createProxy(options) {
             let child;
             try {
                 child = (0, child_process_1.spawn)(cmd, args, {
-                    env: { ...process.env, ...options.env },
+                    env: serverEnv(options),
                     stdio: ['pipe', 'pipe', 'pipe'],
                     detached: true,
                 });
@@ -172,7 +188,7 @@ function createProxy(options) {
             child.on('error', (err) => finish(errorLine(id, -32603, `Failed to start server: ${err.message}`)));
             child.on('close', (code, signal) => {
                 onLine(buffer); // a final reply may lack its trailing newline
-                finish(errorLine(id, -32603, `Server exited (${signal ?? code}) before replying: ${stderr.trim()}`));
+                finish(errorLine(id, -32603, `Server exited (${signal ?? code}) before replying: ${stderrHint(stderr)}`));
             });
         });
     }

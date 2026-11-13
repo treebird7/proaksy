@@ -26,6 +26,8 @@ export interface ProxyOptions {
     env?: Record<string, string>;
     /** log to stderr */
     debug?: boolean;
+    /** pass the server only BASE_ENV plus `env`, not proaksy's whole environment */
+    cleanEnv?: boolean;
 }
 
 export interface Proxy {
@@ -43,6 +45,22 @@ interface Message {
 
 const HANDSHAKE_ID = '__proaksy_initialize__';
 const STDERR_TAIL = 2000;
+const ERROR_STDERR_MAX = 300;
+/** What a server gets under cleanEnv: enough to find binaries and a home dir, no credentials. */
+export const BASE_ENV = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'TERM'];
+
+export function serverEnv(options: ProxyOptions): NodeJS.ProcessEnv {
+    const base = options.cleanEnv
+        ? Object.fromEntries(BASE_ENV.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]]))
+        : process.env;
+    return { ...base, ...options.env };
+}
+
+/** Last stderr line only, capped: enough to debug, little room to leak. Full stderr: --debug. */
+function stderrHint(stderr: string): string {
+    const last = stderr.trim().split('\n').pop() ?? '';
+    return last.length > ERROR_STDERR_MAX ? '…' + last.slice(-ERROR_STDERR_MAX) : last;
+}
 
 // Servers run in their own process group so a wrapper (npx, sh, envoak inject)
 // and the real server die together. Groups still alive when we exit are killed too.
@@ -105,7 +123,7 @@ export function createProxy(options: ProxyOptions): Proxy {
             let child: ChildProcess;
             try {
                 child = spawn(cmd, args, {
-                    env: { ...process.env, ...options.env },
+                    env: serverEnv(options),
                     stdio: ['pipe', 'pipe', 'pipe'],
                     detached: true,
                 });
@@ -175,7 +193,7 @@ export function createProxy(options: ProxyOptions): Proxy {
             child.on('error', (err) => finish(errorLine(id, -32603, `Failed to start server: ${err.message}`)));
             child.on('close', (code, signal) => {
                 onLine(buffer); // a final reply may lack its trailing newline
-                finish(errorLine(id, -32603, `Server exited (${signal ?? code}) before replying: ${stderr.trim()}`));
+                finish(errorLine(id, -32603, `Server exited (${signal ?? code}) before replying: ${stderrHint(stderr)}`));
             });
         });
     }

@@ -12,10 +12,10 @@ rl.on('line', (line) => {
   if (msg.id === undefined) return;
   out({ jsonrpc: '2.0', method: 'notifications/message', params: { level: 'info', data: 'noise' } });
   if (msg.method === 'slow') return; // never replies
-  if (msg.method === 'crash') process.exit(3);
+  if (msg.method === 'crash') { process.stderr.write('line one with SECRET-A\n' + 'x'.repeat(500) + '\n'); process.exit(3); }
   if (msg.method === 'wrong-id') out({ jsonrpc: '2.0', id: 'someone-else', result: {} });
   // reply split across two writes, to exercise line buffering
-  const reply = JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { method: msg.method, initialized, seen: [...seen], env: process.env.A } });
+  const reply = JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { method: msg.method, initialized, seen: [...seen], env: process.env.A, secret: process.env.PROAKSY_TEST_SECRET ?? null, hasPath: !!process.env.PATH } });
   process.stdout.write(reply.slice(0, 10));
   setTimeout(() => process.stdout.write(reply.slice(10) + '\n'), 20);
 });

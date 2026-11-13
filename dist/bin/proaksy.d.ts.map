@@ -1,1 +1,1 @@
-{"version":3,"file":"proaksy.d.ts","sourceRoot":"","sources":["../../src/bin/proaksy.ts"],"names":[],"mappings":";AACA;;GAEG;AAIH,OAAO,EAA+B,YAAY,EAAE,MAAM,cAAc,CAAC;AA2BzE,wBAAgB,SAAS,CAAC,IAAI,EAAE,MAAM,EAAE,GAAG,YAAY,CAuCtD"}
+{"version":3,"file":"proaksy.d.ts","sourceRoot":"","sources":["../../src/bin/proaksy.ts"],"names":[],"mappings":";AACA;;GAEG;AAIH,OAAO,EAA+B,YAAY,EAAE,MAAM,cAAc,CAAC;AA6BzE,wBAAgB,SAAS,CAAC,IAAI,EAAE,MAAM,EAAE,GAAG,YAAY,CA0CtD"}
